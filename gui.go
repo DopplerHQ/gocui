@@ -793,7 +793,6 @@ func (g *Gui) drawFrameEdges(v *View, fgColor, bgColor Attribute) error {
 		}
 	}
 
-	showScrollbar, realScrollbarStart, realScrollbarEnd := calcRealScrollbarStartEnd(v)
 	for y := v.y0 + 1; y < v.y1 && y < g.maxY; y++ {
 		if y < 0 {
 			continue
@@ -804,52 +803,12 @@ func (g *Gui) drawFrameEdges(v *View, fgColor, bgColor Attribute) error {
 			}
 		}
 		if v.x1 > -1 && v.x1 < g.maxX {
-			runeToPrint := calcScrollbarRune(showScrollbar, realScrollbarStart, realScrollbarEnd, v.y0+1, v.y1-1, y, runeV)
-
-			if err := g.SetRune(v.x1, y, runeToPrint, fgColor, bgColor); err != nil {
+			if err := g.SetRune(v.x1, y, runeV, fgColor, bgColor); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-}
-
-func calcScrollbarRune(showScrollbar bool, scrollbarStart int, scrollbarEnd int, rangeStart int, rangeEnd int, position int, runeV rune) rune {
-	if !showScrollbar {
-		return runeV
-	} else if position == rangeStart {
-		return '▲'
-	} else if position == rangeEnd {
-		return '▼'
-	} else if position > scrollbarStart && position < scrollbarEnd {
-		return '█'
-	} else if position > rangeStart && position < rangeEnd {
-		// keeping this as a separate branch in case we later want to render something different here.
-		return runeV
-	} else {
-		return runeV
-	}
-}
-
-func calcRealScrollbarStartEnd(v *View) (bool, int, int) {
-	height := v.InnerHeight() + 1
-	fullHeight := v.ViewLinesHeight() - v.scrollMargin()
-
-	if v.CanScrollPastBottom {
-		fullHeight += height
-	}
-
-	if height < 2 || height >= fullHeight {
-		return false, 0, 0
-	}
-
-	originY := v.OriginY()
-	scrollbarStart, scrollbarHeight := calcScrollbar(fullHeight, height, originY, height-1)
-	top := v.y0 + 1
-	realScrollbarStart := top + scrollbarStart
-	realScrollbarEnd := realScrollbarStart + scrollbarHeight
-
-	return true, realScrollbarStart, realScrollbarEnd
 }
 
 func cornerRune(index byte) rune {
