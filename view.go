@@ -429,13 +429,8 @@ func (v *View) setRune(x, y int, ch rune, fgColor, bgColor Attribute) error {
 		bgColor = v.BgColor
 		ch = v.Mask
 	} else if v.Highlight && ry == rcy {
-		// this ensures we use the bright variant of a colour upon highlight
-		fgColorComponent := fgColor & ^AttrAll
-		if fgColorComponent >= AttrIsValidColor && fgColorComponent < AttrIsValidColor+8 {
-			fgColor += 8
-		}
-		fgColor = fgColor | AttrBold
-		bgColor = bgColor | v.SelBgColor
+		fgColor = v.SelFgColor | AttrBold
+		bgColor = v.SelBgColor | AttrBold
 	}
 
 	// Don't display NUL characters
