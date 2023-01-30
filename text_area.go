@@ -307,6 +307,10 @@ func (self *TextArea) SetCursor2D(x int, y int) {
 	self.cursor = newCursor
 }
 
+func (self *TextArea) SetCursorAtEnd() {
+	self.cursor = len(self.content)
+}
+
 func (self *TextArea) Clear() {
 	self.content = []rune{}
 	self.cursor = 0
