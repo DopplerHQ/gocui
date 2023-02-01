@@ -246,6 +246,7 @@ const (
 	KeyCtrlJ          = Key(tcell.KeyCtrlJ)
 	KeyCtrlK          = Key(tcell.KeyCtrlK)
 	KeyCtrlL          = Key(tcell.KeyCtrlL)
+	KeyLF             = Key(tcell.KeyLF)
 	KeyEnter          = Key(tcell.KeyEnter)
 	KeyCtrlM          = Key(tcell.KeyCtrlM)
 	KeyCtrlN          = Key(tcell.KeyCtrlN)
