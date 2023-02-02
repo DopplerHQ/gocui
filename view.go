@@ -146,6 +146,9 @@ type View struct {
 	// ParentView is the view which catches events bubbled up from the given view if there's no matching handler
 	ParentView *View
 
+	// ConstrainContentsToParent will prevent this view from rendering outside of the parent's dimensions
+	ConstrainContentsToParent bool
+
 	searcher *searcher
 
 	// KeybindOnEdit should be set to true when you want to execute keybindings even when the view is editable
@@ -429,13 +432,8 @@ func (v *View) setRune(x, y int, ch rune, fgColor, bgColor Attribute) error {
 		bgColor = v.BgColor
 		ch = v.Mask
 	} else if v.Highlight && ry == rcy {
-		// this ensures we use the bright variant of a colour upon highlight
-		fgColorComponent := fgColor & ^AttrAll
-		if fgColorComponent >= AttrIsValidColor && fgColorComponent < AttrIsValidColor+8 {
-			fgColor += 8
-		}
-		fgColor = fgColor | AttrBold
-		bgColor = bgColor | v.SelBgColor
+		fgColor = v.SelFgColor | AttrBold
+		bgColor = v.SelBgColor | AttrBold
 	}
 
 	// Don't display NUL characters
@@ -443,8 +441,14 @@ func (v *View) setRune(x, y int, ch rune, fgColor, bgColor Attribute) error {
 		ch = ' '
 	}
 
-	tcellSetCell(v.x0+x+1, v.y0+y+1, ch, fgColor, bgColor, v.outMode)
+	if v.ConstrainContentsToParent && v.ParentView != nil {
+		parentX0, parentY0, parentX1, parentY1 := v.ParentView.Dimensions()
+		if (v.x0+x+1 <= parentX0) || (v.x0+x+1 >= parentX1) || (v.y0+y+1 <= parentY0) || (v.y0+y+1 >= parentY1) {
+			return nil
+		}
+	}
 
+	tcellSetCell(v.x0+x+1, v.y0+y+1, ch, fgColor, bgColor, v.outMode)
 	return nil
 }
 
@@ -1076,10 +1080,23 @@ func (v *View) realPosition(vx, vy int) (x, y int, err error) {
 
 // clearRunes erases all the cells in the view.
 func (v *View) clearRunes() {
-	maxX, maxY := v.Size()
-	for x := 0; x < maxX; x++ {
-		for y := 0; y < maxY; y++ {
-			tcellSetCell(v.x0+x+1, v.y0+y+1, ' ', v.FgColor, v.BgColor, v.outMode)
+	minX := v.x0 + 1
+	minY := v.y0 + 1
+	maxX := v.x0 + v.Width() + 1
+	maxY := v.y0 + v.Height() + 1
+
+	if v.ConstrainContentsToParent && v.ParentView != nil {
+		parentX0, parentY0, parentX1, parentY1 := v.ParentView.Dimensions()
+
+		minX = max(minX, parentX0+1)
+		minY = max(minY, parentY0+1)
+		maxX = min(maxX, parentX1-1)
+		maxY = min(maxY, parentY1-1)
+	}
+
+	for x := minX; x < maxX; x++ {
+		for y := minY; y < maxY; y++ {
+			tcellSetCell(x, y, ' ', v.FgColor, v.BgColor, v.outMode)
 		}
 	}
 }

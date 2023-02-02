@@ -268,11 +268,19 @@ func (g *Gui) Size() (x, y int) {
 // SetRune writes a rune at the given point, relative to the top-left
 // corner of the terminal. It checks if the position is valid and applies
 // the given colors.
-func (g *Gui) SetRune(x, y int, ch rune, fgColor, bgColor Attribute) error {
+func (g *Gui) SetRune(v *View, x, y int, ch rune, fgColor, bgColor Attribute) error {
 	if x < 0 || y < 0 || x >= g.maxX || y >= g.maxY {
 		// swallowing error because it's not that big of a deal
 		return nil
 	}
+
+	if v.ConstrainContentsToParent && v.ParentView != nil {
+		parentX0, parentY0, parentX1, parentY1 := v.ParentView.Dimensions()
+		if (x <= parentX0) || (x >= parentX1) || (y <= parentY0) || (y >= parentY1) {
+			return nil
+		}
+	}
+
 	tcellSetCell(x, y, ch, fgColor, bgColor, g.outputMode)
 	return nil
 }
@@ -782,74 +790,33 @@ func (g *Gui) drawFrameEdges(v *View, fgColor, bgColor Attribute) error {
 			continue
 		}
 		if v.y0 > -1 && v.y0 < g.maxY {
-			if err := g.SetRune(x, v.y0, runeH, fgColor, bgColor); err != nil {
+			if err := g.SetRune(v, x, v.y0, runeH, fgColor, bgColor); err != nil {
 				return err
 			}
 		}
 		if v.y1 > -1 && v.y1 < g.maxY {
-			if err := g.SetRune(x, v.y1, runeH, fgColor, bgColor); err != nil {
+			if err := g.SetRune(v, x, v.y1, runeH, fgColor, bgColor); err != nil {
 				return err
 			}
 		}
 	}
 
-	showScrollbar, realScrollbarStart, realScrollbarEnd := calcRealScrollbarStartEnd(v)
 	for y := v.y0 + 1; y < v.y1 && y < g.maxY; y++ {
 		if y < 0 {
 			continue
 		}
 		if v.x0 > -1 && v.x0 < g.maxX {
-			if err := g.SetRune(v.x0, y, runeV, fgColor, bgColor); err != nil {
+			if err := g.SetRune(v, v.x0, y, runeV, fgColor, bgColor); err != nil {
 				return err
 			}
 		}
 		if v.x1 > -1 && v.x1 < g.maxX {
-			runeToPrint := calcScrollbarRune(showScrollbar, realScrollbarStart, realScrollbarEnd, v.y0+1, v.y1-1, y, runeV)
-
-			if err := g.SetRune(v.x1, y, runeToPrint, fgColor, bgColor); err != nil {
+			if err := g.SetRune(v, v.x1, y, runeV, fgColor, bgColor); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-}
-
-func calcScrollbarRune(showScrollbar bool, scrollbarStart int, scrollbarEnd int, rangeStart int, rangeEnd int, position int, runeV rune) rune {
-	if !showScrollbar {
-		return runeV
-	} else if position == rangeStart {
-		return '▲'
-	} else if position == rangeEnd {
-		return '▼'
-	} else if position > scrollbarStart && position < scrollbarEnd {
-		return '█'
-	} else if position > rangeStart && position < rangeEnd {
-		// keeping this as a separate branch in case we later want to render something different here.
-		return runeV
-	} else {
-		return runeV
-	}
-}
-
-func calcRealScrollbarStartEnd(v *View) (bool, int, int) {
-	height := v.InnerHeight() + 1
-	fullHeight := v.ViewLinesHeight() - v.scrollMargin()
-
-	if v.CanScrollPastBottom {
-		fullHeight += height
-	}
-
-	if height < 2 || height >= fullHeight {
-		return false, 0, 0
-	}
-
-	originY := v.OriginY()
-	scrollbarStart, scrollbarHeight := calcScrollbar(fullHeight, height, originY, height-1)
-	top := v.y0 + 1
-	realScrollbarStart := top + scrollbarStart
-	realScrollbarEnd := realScrollbarStart + scrollbarHeight
-
-	return true, realScrollbarStart, realScrollbarEnd
 }
 
 func cornerRune(index byte) rune {
@@ -921,10 +888,10 @@ func corner(v *View, directions byte) rune {
 func (g *Gui) drawFrameCorners(v *View, fgColor, bgColor Attribute) error {
 	if v.y0 == v.y1 {
 		if !g.SupportOverlaps && v.x0 >= 0 && v.x1 >= 0 && v.y0 >= 0 && v.x0 < g.maxX && v.x1 < g.maxX && v.y0 < g.maxY {
-			if err := g.SetRune(v.x0, v.y0, '╶', fgColor, bgColor); err != nil {
+			if err := g.SetRune(v, v.x0, v.y0, '╶', fgColor, bgColor); err != nil {
 				return err
 			}
-			if err := g.SetRune(v.x1, v.y0, '╴', fgColor, bgColor); err != nil {
+			if err := g.SetRune(v, v.x1, v.y0, '╴', fgColor, bgColor); err != nil {
 				return err
 			}
 		}
@@ -949,7 +916,7 @@ func (g *Gui) drawFrameCorners(v *View, fgColor, bgColor Attribute) error {
 
 	for _, c := range corners {
 		if c.x >= 0 && c.y >= 0 && c.x < g.maxX && c.y < g.maxY {
-			if err := g.SetRune(c.x, c.y, c.ch, fgColor, bgColor); err != nil {
+			if err := g.SetRune(v, c.x, c.y, c.ch, fgColor, bgColor); err != nil {
 				return err
 			}
 		}
@@ -1007,7 +974,7 @@ func (g *Gui) drawTitle(v *View, fgColor, bgColor Attribute) error {
 				currentFgColor -= AttrBold
 			}
 		}
-		if err := g.SetRune(x, v.y0, ch, currentFgColor, currentBgColor); err != nil {
+		if err := g.SetRune(v, x, v.y0, ch, currentFgColor, currentBgColor); err != nil {
 			return err
 		}
 		x += runewidth.RuneWidth(ch)
@@ -1030,7 +997,7 @@ func (g *Gui) drawSubtitle(v *View, fgColor, bgColor Attribute) error {
 		if x >= v.x1 {
 			break
 		}
-		if err := g.SetRune(x, v.y0, ch, fgColor, bgColor); err != nil {
+		if err := g.SetRune(v, x, v.y0, ch, fgColor, bgColor); err != nil {
 			return err
 		}
 		x += runewidth.RuneWidth(ch)
@@ -1059,7 +1026,7 @@ func (g *Gui) drawListFooter(v *View, fgColor, bgColor Attribute) error {
 		if x >= v.x1 {
 			break
 		}
-		if err := g.SetRune(x, v.y1, ch, fgColor, bgColor); err != nil {
+		if err := g.SetRune(v, x, v.y1, ch, fgColor, bgColor); err != nil {
 			return err
 		}
 		x += runewidth.RuneWidth(ch)
